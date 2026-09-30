@@ -104,17 +104,6 @@ jobs:
             --dart-define=SUPABASE_ANON_KEY="$SUPABASE_ANON_KEY" \
             --dart-define=GOOGLE_MAPS_API_KEY="$GOOGLE_MAPS_API_KEY"
 
-      - name: Package first-run upload key backup
-        if: ${{ !secrets.BMT_GO_KEYSTORE_BASE64 }}
-        env:
-          KEYSTORE_PASSWORD: ${{ secrets.BMT_GO_KEYSTORE_PASSWORD }}
-        run: |
-          mkdir -p release-backup
-          cp android/bmtgo-upload.jks release-backup/bmtgo-upload.jks
-          printf '%s\n' "$KEYSTORE_PASSWORD" > release-backup/KEYSTORE_PASSWORD.txt
-          printf '%s\n' 'alias=bmtgo_upload' >> release-backup/KEYSTORE_PASSWORD.txt
-          zip -q -r release-backup/BMT_GO_upload_key_backup.zip release-backup
-
       - name: Upload AAB
         uses: actions/upload-artifact@v4
         with:
