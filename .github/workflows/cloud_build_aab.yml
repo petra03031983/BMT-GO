@@ -112,11 +112,4 @@ jobs:
           if-no-files-found: error
           retention-days: 14
 
-      - name: Upload first-run signing backup
-        if: ${{ !secrets.BMT_GO_KEYSTORE_BASE64 }}
-        uses: actions/upload-artifact@v4
-        with:
-          name: BMT-GO-v42-upload-key-backup
-          path: release-backup/BMT_GO_upload_key_backup.zip
-          if-no-files-found: error
-          retention-days: 14
+      
