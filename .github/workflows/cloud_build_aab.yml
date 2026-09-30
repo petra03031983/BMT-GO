@@ -1,0 +1,133 @@
+name: BMT GO - Cloud AAB Build
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Java 21
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '21'
+
+      - name: Set up Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          flutter-version: '3.35.2'
+          channel: stable
+          cache: true
+
+      - name: Install Android SDK 36
+        uses: android-actions/setup-android@v3
+
+      - name: Ensure Android SDK 36 components
+        run: |
+          yes | sdkmanager --licenses >/dev/null || true
+          sdkmanager "platform-tools" "platforms;android-36" "build-tools;35.0.0"
+
+      - name: Install Gradle and create wrapper if missing
+        uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: '8.7'
+
+      - name: Generate Gradle wrapper when absent
+        working-directory: android
+        run: |
+          if [ ! -f gradlew ]; then
+            gradle wrapper --gradle-version 8.7
+          fi
+          chmod +x gradlew
+
+      - name: Flutter dependencies
+        run: flutter pub get
+
+      - name: Release gate
+        run: |
+          if [ -x ./tool/check_release_gate_v41.sh ]; then
+            ./tool/check_release_gate_v41.sh
+          elif [ -x ./tool/check_release_gate.sh ]; then
+            ./tool/check_release_gate.sh
+          fi
+
+      - name: Prepare signing
+        env:
+          KEYSTORE_PASSWORD: ${{ secrets.BMT_GO_KEYSTORE_PASSWORD }}
+        run: |
+          mkdir -p android
+          if [ -n "${{ secrets.BMT_GO_KEYSTORE_BASE64 }}" ]; then
+            echo "Using stored upload keystore."
+            echo "${{ secrets.BMT_GO_KEYSTORE_BASE64 }}" | base64 --decode > android/bmtgo-upload.jks
+            cat > android/key.properties <<EOF
+storePassword=${KEYSTORE_PASSWORD}
+keyPassword=${KEYSTORE_PASSWORD}
+keyAlias=bmtgo_upload
+storeFile=bmtgo-upload.jks
+EOF
+          else
+            if [ -z "$KEYSTORE_PASSWORD" ]; then
+              echo "Missing secret BMT_GO_KEYSTORE_PASSWORD."
+              echo "Set it in GitHub: Settings -> Secrets and variables -> Actions."
+              exit 1
+            fi
+            keytool -genkeypair -v \
+              -keystore android/bmtgo-upload.jks \
+              -storepass "$KEYSTORE_PASSWORD" \
+              -keypass "$KEYSTORE_PASSWORD" \
+              -alias bmtgo_upload \
+              -keyalg RSA -keysize 2048 -validity 10000 \
+              -dname "CN=BMT GO, OU=Mobile, O=BMT GO, L=Astana, ST=Astana, C=KZ"
+            cat > android/key.properties <<EOF
+storePassword=${KEYSTORE_PASSWORD}
+keyPassword=${KEYSTORE_PASSWORD}
+keyAlias=bmtgo_upload
+storeFile=bmtgo-upload.jks
+EOF
+          fi
+
+      - name: Build signed AAB
+        env:
+          SUPABASE_URL: ${{ secrets.BMT_GO_SUPABASE_URL }}
+          SUPABASE_ANON_KEY: ${{ secrets.BMT_GO_SUPABASE_ANON_KEY }}
+          GOOGLE_MAPS_API_KEY: ${{ secrets.BMT_GO_GOOGLE_MAPS_API_KEY }}
+        run: |
+          flutter build appbundle --release \
+            --dart-define=SUPABASE_URL="$SUPABASE_URL" \
+            --dart-define=SUPABASE_ANON_KEY="$SUPABASE_ANON_KEY" \
+            --dart-define=GOOGLE_MAPS_API_KEY="$GOOGLE_MAPS_API_KEY"
+
+      - name: Package first-run upload key backup
+        if: ${{ !secrets.BMT_GO_KEYSTORE_BASE64 }}
+        env:
+          KEYSTORE_PASSWORD: ${{ secrets.BMT_GO_KEYSTORE_PASSWORD }}
+        run: |
+          mkdir -p release-backup
+          cp android/bmtgo-upload.jks release-backup/bmtgo-upload.jks
+          printf '%s\n' "$KEYSTORE_PASSWORD" > release-backup/KEYSTORE_PASSWORD.txt
+          printf '%s\n' 'alias=bmtgo_upload' >> release-backup/KEYSTORE_PASSWORD.txt
+          zip -q -r release-backup/BMT_GO_upload_key_backup.zip release-backup
+
+      - name: Upload AAB
+        uses: actions/upload-artifact@v4
+        with:
+          name: BMT-GO-v42-AAB
+          path: build/app/outputs/bundle/release/app-release.aab
+          if-no-files-found: error
+          retention-days: 14
+
+      - name: Upload first-run signing backup
+        if: ${{ !secrets.BMT_GO_KEYSTORE_BASE64 }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: BMT-GO-v42-upload-key-backup
+          path: release-backup/BMT_GO_upload_key_backup.zip
+          if-no-files-found: error
+          retention-days: 14

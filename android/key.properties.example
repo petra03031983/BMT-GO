@@ -1,0 +1,6 @@
+# Copy this file to android/key.properties and fill in your PRIVATE values.
+# Never commit key.properties or the .jks file to Git or upload them to public storage.
+storePassword=CHANGE_ME
+keyPassword=CHANGE_ME
+keyAlias=bmtgo-upload
+storeFile=../keystore/bmtgo-upload.jks

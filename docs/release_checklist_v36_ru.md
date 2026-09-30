@@ -1,0 +1,21 @@
+# BMT GO v36 — чек-лист перед Google Play
+
+- [ ] applicationId = com.bmtgo.app
+- [ ] versionName = 1.14.0
+- [ ] versionCode = 36
+- [ ] compileSdk = 36
+- [ ] targetSdk = 36
+- [ ] установлен Android SDK Platform 36
+- [ ] создан собственный upload keystore
+- [ ] android/key.properties создан локально и НЕ загружен в репозиторий
+- [ ] настроены реальные Supabase URL/anon key
+- [ ] настроен Google Maps API key и ограничения ключа
+- [ ] настроен Firebase для push-уведомлений (если используем push)
+- [ ] настроен реальный платёжный мерчант и webhook
+- [ ] опубликована privacy policy по HTTPS
+- [ ] опубликована страница удаления аккаунта по HTTPS
+- [ ] указан реальный контакт поддержки
+- [ ] заполнен Google Play Data Safety
+- [ ] собран подписанный AAB
+- [ ] AAB установлен на тестовый Android-телефон
+- [ ] проверены регистрация, создание заказа, назначение курьера, GPS, статусы, оплата, выплаты и удаление аккаунта

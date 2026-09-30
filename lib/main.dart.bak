@@ -1,0 +1,135 @@
+import 'dart:async';
+import 'package:flutter/material.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
+import 'package:geolocator/geolocator.dart';
+import 'package:google_maps_flutter/google_maps_flutter.dart';
+import 'notification_service.dart';
+
+const yellow = Color(0xFFFFD400);
+
+Future<void> main() async {
+  WidgetsFlutterBinding.ensureInitialized();
+  const url = String.fromEnvironment('SUPABASE_URL');
+  const key = String.fromEnvironment('SUPABASE_ANON_KEY');
+  if (url.isNotEmpty && key.isNotEmpty) {
+    await Supabase.initialize(url: url, anonKey: key);
+    await BmtNotifications.init(Supabase.instance.client);
+  }
+  runApp(const BmtGo());
+}
+
+class BmtGo extends StatelessWidget {
+  const BmtGo({super.key});
+  @override
+  Widget build(BuildContext context) => MaterialApp(
+    debugShowCheckedModeBanner: false,
+    title: 'BMT GO',
+    theme: ThemeData(useMaterial3: true, colorScheme: ColorScheme.fromSeed(seedColor: yellow)),
+    home: Supabase.instance.isInitialized ? const Dashboard() : const Setup(),
+  );
+}
+
+class Setup extends StatelessWidget {
+  const Setup({super.key});
+  @override
+  Widget build(BuildContext context) => Scaffold(
+    body: Center(child: Padding(padding: const EdgeInsets.all(24), child: Column(mainAxisSize: MainAxisSize.min, children: const [
+      Icon(Icons.local_shipping, size: 70), SizedBox(height: 12),
+      Text('BMT GO', style: TextStyle(fontSize: 32, fontWeight: FontWeight.w900)),
+      SizedBox(height: 12), Text('Подключи Supabase через SUPABASE_URL и SUPABASE_ANON_KEY.', textAlign: TextAlign.center),
+    ])),
+  );
+}
+
+class Dashboard extends StatefulWidget { const Dashboard({super.key}); @override State<Dashboard> createState()=>_DashboardState(); }
+class _DashboardState extends State<Dashboard> {
+  int tab = 0;
+  StreamSubscription<Position>? gps;
+  Position? pos;
+  List<Map<String,dynamic>> orders = [];
+  Map<String,dynamic>? selected;
+  final db = Supabase.instance.client;
+
+  @override void initState(){ super.initState(); _listenOrders(); }
+  void _listenOrders(){ db.from('orders').stream(primaryKey:['id']).order('created_at').listen((x){ if(mounted)setState(()=>orders=x.reversed.toList()); }); }
+
+  Future<void> startGps() async {
+    if(!await Geolocator.isLocationServiceEnabled()){_msg('Включите геолокацию');return;}
+    var p=await Geolocator.checkPermission();
+    if(p==LocationPermission.denied)p=await Geolocator.requestPermission();
+    if(p==LocationPermission.denied||p==LocationPermission.deniedForever){_msg('Нет разрешения на геолокацию');return;}
+    await gps?.cancel();
+    gps=Geolocator.getPositionStream(locationSettings:const LocationSettings(accuracy:LocationAccuracy.high,distanceFilter:15)).listen((p){
+      if(mounted)setState(()=>pos=p); _saveLocation(p);
+    });
+    _msg('GPS курьера включён');
+  }
+  Future<void> _saveLocation(Position p) async { final u=db.auth.currentUser; if(u==null)return; try{await db.from('courier_locations').upsert({'courier_id':u.id,'lat':p.latitude,'lng':p.longitude,'updated_at':DateTime.now().toIso8601String()});}catch(_){ } }
+  Future<void> accept(String id) async { try{await db.rpc('accept_order',params:{'p_order_id':id});_msg('Заказ принят');}catch(_){_msg('Заказ уже занят или произошла ошибка');} }
+  Future<void> advance(String id,String status) async { try{await db.rpc('advance_order_status',params:{'p_order_id':id,'p_status':status});}catch(_){_msg('Не удалось изменить статус');} }
+  void _msg(String s)=>ScaffoldMessenger.of(context).showSnackBar(SnackBar(content:Text(s)));
+  @override void dispose(){gps?.cancel();super.dispose();}
+
+  @override Widget build(BuildContext c)=>Scaffold(
+    appBar: AppBar(backgroundColor:Colors.black,foregroundColor:Colors.white,title:const Text('BMT GO',style:TextStyle(fontWeight:FontWeight.w900)),actions:[IconButton(onPressed:()=>setState(()=>selected=null),icon:const Icon(Icons.refresh))]),
+    body: selected==null ? IndexedStack(index:tab,children:[_client(),_courier(),_admin()]) : _orderDetails(selected!),
+    bottomNavigationBar: selected==null ? NavigationBar(selectedIndex:tab,onDestinationSelected:(i)=>setState(()=>tab=i),destinations:const[
+      NavigationDestination(icon:Icon(Icons.person),label:'Клиент'),NavigationDestination(icon:Icon(Icons.delivery_dining),label:'Курьер'),NavigationDestination(icon:Icon(Icons.admin_panel_settings),label:'Админ')]) : null,
+  );
+
+  Widget _client()=>ListView(padding:const EdgeInsets.all(14),children:[
+    const Text('Доставка',style:TextStyle(fontSize:28,fontWeight:FontWeight.w900)),
+    const SizedBox(height:4),const Text('Быстро. Просто. Рядом.'),const SizedBox(height:14),
+    _actionCard(Icons.add_location_alt,'Создать заказ','Укажите откуда и куда доставить',()=>_createOrderDialog()),
+    const SizedBox(height:12),
+    SizedBox(height:250,child:BmtMap(position:pos)),const SizedBox(height:12),
+    ...orders.take(5).map((o)=>_orderCard(o,'client')),
+  ]);
+
+  Widget _courier()=>ListView(padding:const EdgeInsets.all(14),children:[
+    Row(children:[const Expanded(child:Text('Работа курьера',style:TextStyle(fontSize:25,fontWeight:FontWeight.w900))),FilledButton.icon(onPressed:startGps,icon:const Icon(Icons.gps_fixed),label:const Text('GPS'))]),
+    const SizedBox(height:12),SizedBox(height:250,child:BmtMap(position:pos)),const SizedBox(height:12),
+    ...orders.where((o)=>o['status']!='cancelled'&&o['status']!='delivered').map((o)=>_orderCard(o,'courier')),
+  ]);
+
+  Widget _admin()=>ListView(padding:const EdgeInsets.all(14),children:[
+    const Text('Панель BMT GO',style:TextStyle(fontSize:25,fontWeight:FontWeight.w900)),const SizedBox(height:12),
+    Row(children:[Expanded(child=_stat('Заказы','${orders.length}')),const SizedBox(width:8),Expanded(child=_stat('Выручка','${orders.fold<num>(0,(s,o)=>s+(o['price']??0))} ₸'))]),
+    const SizedBox(height:12),...orders.map((o)=>_orderCard(o,'admin')),
+  ]);
+
+  Widget _stat(String a,String b)=>Card(child:Padding(padding:const EdgeInsets.all(14),child:Column(crossAxisAlignment:CrossAxisAlignment.start,children:[Text(a),Text(b,style:const TextStyle(fontSize:21,fontWeight:FontWeight.bold))])));
+  Widget _actionCard(IconData icon,String title,String sub,VoidCallback onTap)=>Card(child:ListTile(leading:CircleAvatar(backgroundColor:yellow,child:Icon(icon,color:Colors.black)),title:Text(title,style:const TextStyle(fontWeight:FontWeight.bold)),subtitle:Text(sub),trailing:const Icon(Icons.chevron_right),onTap:onTap));
+
+  Widget _orderCard(Map<String,dynamic> o,String role){
+    final s=o['status']??'searching';
+    Widget? action;
+    if(role=='courier'&&s=='searching') action=FilledButton(onPressed:()=>accept(o['id']),child:const Text('Принять'));
+    if(role=='courier'&&s=='assigned') action=FilledButton(onPressed:()=>advance(o['id'],'picked'),child:const Text('Забрал'));
+    if(role=='courier'&&s=='picked') action=FilledButton(onPressed:()=>advance(o['id'],'delivering'),child:const Text('В пути'));
+    if(role=='courier'&&s=='delivering') action=FilledButton(onPressed:()=>advance(o['id'],'delivered'),child:const Text('Доставлено'));
+    return Card(child:InkWell(onTap:()=>setState(()=>selected=o),child:Padding(padding:const EdgeInsets.all(13),child:Column(crossAxisAlignment:CrossAxisAlignment.start,children:[
+      Row(children:[Expanded(child:Text(o['code']??'BMT GO',style:const TextStyle(fontWeight:FontWeight.w900))),_status(s)]),
+      const SizedBox(height:7),Text('${o['from_address']??'Откуда'} → ${o['to_address']??'Куда'}'),
+      const SizedBox(height:5),Text('${o['price']??0} ₸'),if(action!=null)Align(alignment:Alignment.centerRight,child:action)
+    ]))));
+  }
+  Widget _status(String s)=>Container(padding:const EdgeInsets.symmetric(horizontal:9,vertical:5),decoration:BoxDecoration(color:Colors.black,borderRadius:BorderRadius.circular(20)),child:Text(s,style:const TextStyle(color:Colors.white,fontSize:12)));
+
+  Widget _orderDetails(Map<String,dynamic> o)=>Scaffold(appBar:AppBar(title:Text(o['code']??'Заказ'),leading:IconButton(icon:const Icon(Icons.arrow_back),onPressed:()=>setState(()=>selected=null))),body:ListView(padding:const EdgeInsets.all(16),children:[
+    SizedBox(height:300,child:BmtMap(position:pos)),const SizedBox(height:16),
+    Text('${o['from_address']??'Откуда'}',style:const TextStyle(fontSize:18,fontWeight:FontWeight.bold)),const Icon(Icons.arrow_downward),Text('${o['to_address']??'Куда'}',style:const TextStyle(fontSize:18,fontWeight:FontWeight.bold)),
+    const SizedBox(height:16),_status(o['status']??''),const SizedBox(height:12),Text('Стоимость: ${o['price']??0} ₸'),
+  ]));
+
+  Future<void> _createOrderDialog() async {
+    final from=TextEditingController(),to=TextEditingController(),price=TextEditingController(text:'2000');
+    if(!mounted)return;
+    await showDialog(context:context,builder:(ctx)=>AlertDialog(title:const Text('Новый заказ'),content:SingleChildScrollView(child:Column(children:[TextField(controller:from,decoration:const InputDecoration(labelText:'Откуда')),TextField(controller:to,decoration:const InputDecoration(labelText:'Куда')),TextField(controller:price,keyboardType:TextInputType.number,decoration:const InputDecoration(labelText:'Цена, ₸'))])),actions:[TextButton(onPressed:()=>Navigator.pop(ctx),child:const Text('Отмена')),FilledButton(onPressed:()async{try{final u=db.auth.currentUser;if(u==null){_msg('Сначала подключите авторизацию');return;}await db.from('orders').insert({'client_id':u.id,'from_address':from.text,'to_address':to.text,'price':int.tryParse(price.text)??2000,'status':'searching'});if(ctx.mounted)Navigator.pop(ctx);_msg('Заказ создан');}catch(e){_msg('Не удалось создать заказ');}},child:const Text('Создать'))]));
+  }
+}
+
+class BmtMap extends StatelessWidget {
+  final Position? position; const BmtMap({super.key,this.position});
+  @override Widget build(BuildContext context){final target=LatLng(position?.latitude??51.1694,position?.longitude??71.4491);return ClipRRect(borderRadius:BorderRadius.circular(16),child:GoogleMap(initialCameraPosition:CameraPosition(target:target,zoom:position==null?11:16),markers:{if(position!=null)Marker(markerId:const MarkerId('courier'),position:target,infoWindow:const InfoWindow(title:'Курьер BMT GO'))},myLocationEnabled:position!=null,myLocationButtonEnabled:true,zoomControlsEnabled:false));}
+}

@@ -1,0 +1,11 @@
+.dart_tool/
+.packages
+build/
+android/.gradle/
+android/key.properties
+keystore/*.jks
+*.jks
+*.keystore
+
+android/*.jks
+release-backup/
