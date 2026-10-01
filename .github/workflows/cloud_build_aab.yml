@@ -36,6 +36,10 @@ jobs:
           yes | sdkmanager --licenses >/dev/null || true
           sdkmanager "platform-tools" "platforms;android-36" "build-tools;35.0.0"
 
+      - name: Create Flutter local.properties
+        run: |
+          echo "flutter.sdk=$FLUTTER_ROOT" > android/local.properties
+
       - name: Install Gradle and create wrapper if missing
         uses: gradle/actions/setup-gradle@v4
         with:
