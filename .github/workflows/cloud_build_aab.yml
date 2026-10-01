@@ -66,11 +66,7 @@ jobs:
           if [ -n "${{ secrets.BMT_GO_KEYSTORE_BASE64 }}" ]; then
             echo "Using stored upload keystore."
             echo "${{ secrets.BMT_GO_KEYSTORE_BASE64 }}" | base64 --decode > android/bmtgo-upload.jks
-            printf '%s\n' \
-  "storePassword=${KEYSTORE_PASSWORD}" \
-  "keyPassword=${KEYSTORE_PASSWORD}" \
-  "keyAlias=bmtgo_upload" \
-  "storeFile=bmtgo-upload.jks" > android/key.properties
+            printf '%s\n' "storePassword=${KEYSTORE_PASSWORD}" "keyPassword=${KEYSTORE_PASSWORD}" "keyAlias=bmtgo_upload" "storeFile=bmtgo-upload.jks" > android/key.properties
           else
             if [ -z "$KEYSTORE_PASSWORD" ]; then
               echo "Missing secret BMT_GO_KEYSTORE_PASSWORD."
@@ -85,11 +81,7 @@ jobs:
               -keyalg RSA -keysize 2048 -validity 10000 \
               -dname "CN=BMT GO, OU=Mobile, O=BMT GO, L=Astana, ST=Astana, C=KZ"
             
-            printf '%s\n' \
-  "storePassword=${KEYSTORE_PASSWORD}" \
-  "keyPassword=${KEYSTORE_PASSWORD}" \
-  "keyAlias=bmtgo_upload" \
-  "storeFile=bmtgo-upload.jks" > android/key.properties
+            printf '%s\n' "storePassword=${KEYSTORE_PASSWORD}" "keyPassword=${KEYSTORE_PASSWORD}" "keyAlias=bmtgo_upload" "storeFile=bmtgo-upload.jks" > android/key.properties
 
       - name: Build signed AAB
         env:
