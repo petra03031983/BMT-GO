@@ -27,7 +27,7 @@ jobs:
           cache: true
 
       - name: Install Android SDK 36
-        uses: android-actions/setup-android@v3
+        uses: android-actions/setup-android@v4
 
       - name: Ensure Android SDK 36 components
         run: |
