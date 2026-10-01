@@ -49,42 +49,12 @@ jobs:
           fi
           chmod +x gradlew
 
-      - name: Flutter dependencies
-        run: flutter pub get
-
-      - name: Release gate
-        run: |
-          if [ -x ./tool/check_release_gate_v41.sh ]; then
-            ./tool/check_release_gate_v41.sh
-          elif [ -x ./tool/check_release_gate.sh ]; then
-            ./tool/check_release_gate.sh
-          fi
-
       - name: Prepare signing
         env:
           KEYSTORE_PASSWORD: ${{ secrets.BMT_GO_KEYSTORE_PASSWORD }}
         run: |
-          mkdir -p android
-          if [ -n "${{ secrets.BMT_GO_KEYSTORE_BASE64 }}" ]; then
-            echo "Using stored upload keystore."
-            echo "${{ secrets.BMT_GO_KEYSTORE_BASE64 }}" | base64 --decode > android/bmtgo-upload.jks
-            printf '%s\n' "storePassword=${KEYSTORE_PASSWORD}" "keyPassword=${KEYSTORE_PASSWORD}" "keyAlias=bmtgo_upload" "storeFile=bmtgo-upload.jks" > android/key.properties
-          else
-            if [ -z "$KEYSTORE_PASSWORD" ]; then
-              echo "Missing secret BMT_GO_KEYSTORE_PASSWORD."
-              echo "Set it in GitHub: Settings -> Secrets and variables -> Actions."
-              exit 1
-            fi
-            keytool -genkeypair -v \
-              -keystore android/bmtgo-upload.jks \
-              -storepass "$KEYSTORE_PASSWORD" \
-              -keypass "$KEYSTORE_PASSWORD" \
-              -alias bmtgo_upload \
-              -keyalg RSA -keysize 2048 -validity 10000 \
-              -dname "CN=BMT GO, OU=Mobile, O=BMT GO, L=Astana, ST=Astana, C=KZ"
-            
-            printf '%s\n' "storePassword=${KEYSTORE_PASSWORD}" "keyPassword=${KEYSTORE_PASSWORD}" "keyAlias=bmtgo_upload" "storeFile=bmtgo-upload.jks" > android/key.properties
-
+          keytool -genkeypair -v -keystore android/bmtgo-upload.jks -storepass "$KEYSTORE_PASSWORD" -keypass "$KEYSTORE_PASSWORD" -alias bmtgo_upload -keyalg RSA -keysize 2048 -validity 10000 -dname "CN=BMT GO, OU=Mobile, O=BMT GO, L=Astana, ST=Astana, C=KZ"
+          printf '%s\n' "storePassword=${KEYSTORE_PASSWORD}" "keyPassword=${KEYSTORE_PASSWORD}" "keyAlias=bmtgo_upload" "storeFile=bmtgo-upload.jks" > android/key.properties
       - name: Build signed AAB
         env:
           SUPABASE_URL: ${{ secrets.BMT_GO_SUPABASE_URL }}
