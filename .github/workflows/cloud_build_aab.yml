@@ -1,6 +1,8 @@
 name: BMT GO - Cloud AAB Build
 
 on:
+  push:
+    branches: [main]
   workflow_dispatch:
 
 permissions:
