@@ -4,11 +4,11 @@ ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 cd "$ROOT"
 fail=0
 check(){ if eval "$2" >/dev/null 2>&1; then echo "OK  $1"; else echo "FAIL $1"; fail=1; fi; }
-check 'pubspec version 1.18.0+41' "grep -q '^version: 1.19.0+42' pubspec.yaml"
+check 'pubspec version 1.19.0+42' "grep -q '^version: 1.19.0+42' pubspec.yaml"
 check 'applicationId com.bmtgo.app' "grep -Eq \"applicationId[[:space:]]+['\\\"]com\\.bmtgo\\.app['\\\"]\" android/app/build.gradle"
 check 'compileSdk 36' "grep -q 'compileSdk 36' android/app/build.gradle"
 check 'targetSdk 36' "grep -q 'targetSdk 36' android/app/build.gradle"
-check 'versionCode 41' "grep -q 'versionCode 42' android/app/build.gradle"
+check 'versionCode 42' "grep -q 'versionCode 42' android/app/build.gradle"
 check 'privacy policy exists' "test -s docs/privacy_policy_ru.html"
 check 'privacy support email' "grep -q 'petra03031983@gmail.com' docs/privacy_policy_ru.html"
 check 'account deletion page exists' "test -s docs/account_deletion.html"
