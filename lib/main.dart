@@ -152,7 +152,7 @@ class _DashboardState extends State<Dashboard>{
     await _markNotificationsRead();
     if(!mounted)return;
     showModalBottomSheet(context:context,isScrollControlled:true,builder:(ctx)=>SizedBox(height:MediaQuery.of(ctx).size.height*0.7,child:Padding(padding:const EdgeInsets.all(16),child:Column(crossAxisAlignment:CrossAxisAlignment.start,children:[
-      Row(children:[const Expanded(child:Text('Уведомления',style:TextStyle(fontSize:22,fontWeight:FontWeight.w900))),IconButton(onPressed:()=>Navigator.pop(ctx),icon:const Icon(Icons.close))]),
+      Row(children:[Expanded(child:Text('Уведомления',style:TextStyle(fontSize:22,fontWeight:FontWeight.w900))),IconButton(onPressed:()=>Navigator.pop(ctx),icon:const Icon(Icons.close))]),
       const Divider(),
       Expanded(child:notifications.isEmpty?const Center(child:Text('Пока уведомлений нет.')):ListView(children:notifications.map((n)=>ListTile(leading:const CircleAvatar(child:Icon(Icons.notifications)),title:Text('${n['title']??'BMT GO'}',style:const TextStyle(fontWeight:FontWeight.w700)),subtitle:Text('${n['body']??''}\n${n['created_at']??''}'))).toList()))
     ]))));
@@ -185,7 +185,7 @@ class _DashboardState extends State<Dashboard>{
     final mine=orders.where((o)=>role=='client'?o['client_id']==uid:o['courier_id']==uid).toList();
     final done=mine.where((o)=>o['status']=='delivered'||o['status']=='cancelled').toList();
     await showModalBottomSheet(context:context,isScrollControlled:true,builder:(ctx)=>SizedBox(height:MediaQuery.of(ctx).size.height*.82,child:Padding(padding:const EdgeInsets.all(16),child:Column(crossAxisAlignment:CrossAxisAlignment.start,children:[
-      Row(children:[const Expanded(child:Text('История заказов',style:TextStyle(fontSize:23,fontWeight:FontWeight.w900))),IconButton(onPressed:()=>Navigator.pop(ctx),icon:const Icon(Icons.close))]),
+      Row(children:[Expanded(child:Text('История заказов',style:TextStyle(fontSize:23,fontWeight:FontWeight.w900))),IconButton(onPressed:()=>Navigator.pop(ctx),icon:const Icon(Icons.close))]),
       Text('${done.length} завершённых заказов'),const SizedBox(height:10),
       Expanded(child:done.isEmpty?const Center(child:Text('История пока пустая.')):ListView.separated(itemCount:done.length,itemBuilder:(c,i){final o=done[i];return ListTile(onTap:(){Navigator.pop(ctx);setState(()=>selected=o);},leading:CircleAvatar(child:Icon(o['status']=='delivered'?Icons.check:Icons.close)),title:Text('${o['code']??'Заказ'} • ${o['price']??0} ₸'),subtitle:Text('${o['from_address']??''} → ${o['to_address']??''}'),trailing:_status('${o['status']}'));},separatorBuilder:(_,__)=>const Divider()))
     ]))));
@@ -262,7 +262,7 @@ class _DashboardState extends State<Dashboard>{
     final week=done.where((o){final d=DateTime.tryParse('${o['updated_at']??o['created_at']}');return d!=null&&!d.isBefore(DateTime(weekStart.year,weekStart.month,weekStart.day));});
     final month=done.where((o){final d=DateTime.tryParse('${o['updated_at']??o['created_at']}');return d!=null&&d.year==now.year&&d.month==now.month;});
     return Card(child:Padding(padding:const EdgeInsets.all(14),child:Column(crossAxisAlignment:CrossAxisAlignment.start,children:[
-      Row(children:[const Expanded(child:Text('Мой заработок',style:TextStyle(fontSize:20,fontWeight:FontWeight.w900))),IconButton(onPressed:()=>setState((){}),icon:const Icon(Icons.refresh))]),
+      Row(children:[Expanded(child:Text('Мой заработок',style:TextStyle(fontSize:20,fontWeight:FontWeight.w900))),IconButton(onPressed:()=>setState((){}),icon:const Icon(Icons.refresh))]),
       const Text('Расчёт для демонстрации: 80% стоимости заказа'),const SizedBox(height:12),
       Row(children:[Expanded(child:_stat('Сегодня','${_sumEarnings(day)} ₸')),const SizedBox(width:8),Expanded(child:_stat('Неделя','${_sumEarnings(week)} ₸')),const SizedBox(width:8),Expanded(child:_stat('Месяц','${_sumEarnings(month)} ₸'))]),
       const SizedBox(height:8),Text('Выполнено за месяц: ${month.length} доставок'),
