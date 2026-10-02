@@ -347,7 +347,8 @@ Future<void> _createOrderDialog() async {
       TextField(controller:to,decoration:const InputDecoration(labelText:'Куда / адрес получателя',prefixIcon:Icon(Icons.location_on))),
       const SizedBox(height:10),
       OutlinedButton.icon(onPressed:()async{final p=await _pickMapPoint(initial:dropoff ?? pickup);if(p!=null){setD((){dropoff=p;routing=true;});if(pickup!=null){final rr=await RouteService.getRoute(origin:pickup!,destination:p);if(ctx.mounted)setD((){if(rr!=null){distance=rr.distanceKm;durationMin=rr.durationMin;routePoints=rr.points;}else{distance=Geolocator.distanceBetween(pickup!.latitude,pickup!.longitude,p.latitude,p.longitude)/1000;durationMin=null;routePoints=[pickup!,p];}price=calculateDeliveryPrice(distance!);routing=false;});}}}},icon:const Icon(Icons.map),label:Text(dropoff==null?'Указать точку доставки на карте':'Точка доставки выбрана')),
-      if(routing) const Padding(padding:EdgeInsets.only(top:8),child:LinearProgressIndicator()),
+      double? durationMin;
+if(routing) const Padding(padding:EdgeInsets.only(top:8),child:LinearProgressIndicator()),
       if(dropoff!=null && distance!=null) Padding(padding:const EdgeInsets.only(top:8),child:Text('Маршрут: ${distance!.toStringAsFixed(1)} км${durationMin==null?'':' • около $durationMin мин'}')), 
       const SizedBox(height:8),
       Card(child:ListTile(title:const Text('Ориентировочная стоимость'),trailing:Text('$price ₸',style:const TextStyle(fontSize:20,fontWeight:FontWeight.w900)))),
